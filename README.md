@@ -1,5 +1,9 @@
+# RamblingGPT
 
-# nanoGPT
+Uses reduced character dataset including removing uppercase letters, and replacing with a preceeding shift key giving a total of 60 tokens.
+\n" !$&'#,=-<>*@.:;[]()?^0123456789abcdefghijklmnopqrstuvwxyz
+
+# This is a clone of nanoGPT
 
 ![nanoGPT](assets/nanogpt.jpg)
 
