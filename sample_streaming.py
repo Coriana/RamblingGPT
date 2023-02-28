@@ -35,7 +35,7 @@ class History:
     
     def add(self, line):
         line_length = len(line)
-        while (self.length + line_length) > (MAX_HISTORY_LENGTH - len(self.direction)):
+        while (self.length + line_length) > (MAX_HISTORY_LENGTH - len(self.direction)) and self.length >=2:
             self.length -= len(self.lines.pop(0))
         self.lines.append(line)
         self.length += line_length
@@ -87,9 +87,9 @@ def add_caseifer(text):
 # -----------------------------------------------------------------------------
 init_from = 'resume' # either 'resume' (from an out_dir) or a gpt2 variant (e.g. 'gpt2-xl')
 out_dir = 'lamda' # ignored if init_from is not 'resume'
-start = "\n" # or "<|endoftext|>" or etc. Can also specify a file, use as: "FILE:prompt.txt"
+start = "Eml:Welcome to the chat.\nEml:I am here to help out.\n" # or "<|endoftext|>" or etc. Can also specify a file, use as: "FILE:prompt.txt"
 num_samples = 1 # number of samples to draw
-max_new_tokens = 4096 # number of tokens generated in each sample
+max_new_tokens = 1024 # number of tokens generated in each sample
 temperature = 0.8 # 1.0 = no change, < 1.0 = less random, > 1.0 = more random, in predictions
 top_k = 200 # retain only the top_k most likely tokens, clamp others to have 0 probability
 seed = 1336
@@ -160,44 +160,45 @@ else:
 if start.startswith('FILE:'):
     with open(start[5:], 'r', encoding='utf-8') as f:
         start = f.read()
-        
+text = ''
 history = start
+past_history.direction = "Eml: I'm Emelda."
+past_history.add(start)
+
 # run generation
 with torch.no_grad():
     with ctx:
         while True:
-                if init_from.startswith('gpt2'):
-                    start_ids = encode(history)
+            history = str(past_history) # append input to history
+            start_ids = encode(add_caseifer(history))
+           # print(history)
+            x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
+            generated_text = ''
+            shift = False
+            for idx_next in model.generate_streaming(x, max_new_tokens, temperature=temperature, top_k=top_k):
+                # convert the index to a character and print it to the screen
+                char = decode([idx_next])
+                # append the character to the generated text
+                if shift:
+                    generated_text += char.upper()
+                    print(char.upper(), end='', flush=True)
+                    shift = False
+                elif char == '^':
+                    shift = True
                 else:
-                    start_ids = encode(add_caseifer(history))
-                # print(history)
-                x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
-                generated_text = ''
-                shift = False
-                for idx_next in model.generate_streaming(x, max_new_tokens, temperature=temperature, top_k=top_k):
-                    # convert the index to a character and print it to the screen
-                    char = decode([idx_next])
-                    # append the character to the generated text
-                    if shift:
-                        generated_text += char.upper()
-                        print(char.upper(), end='', flush=True)
-                        shift = False
-                    elif char == '^':
-                        shift = True
-                    else:
-                        generated_text += char
-                        print(char, end='', flush=True)
+                    generated_text += char
+                    print(char, end='', flush=True)
 
-                    # check for newline character
-                    if char == '\n':
-                        # append the completed line to the list or print it to the screen
-                   #     generated_sequences.append(generated_text)
-                        # reset the generated text for the next line
-                        actual_output = generated_text
-                        generated_text = ''
-                        break
-              
-                text = int(input(">:"))
-                
-                history = history + actual_output + text
-
+                # check for newline character
+                if char == '\n':
+                    # append the completed line to the list or print it to the screen
+               #     generated_sequences.append(generated_text)
+                    # reset the generated text for the next line
+                    actual_output = generated_text
+                    generated_text = ''
+                    break
+            past_history.add(actual_output)
+          #  text = input(">:")
+            if text != '':
+                past_history.add(text + '\n')
+            text = ''
